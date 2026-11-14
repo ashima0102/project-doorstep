@@ -21,6 +21,6 @@ public class ApplicationController {
 
     @PostMapping
     public EvaluationResponse submit(@Valid @RequestBody ApplicationRequest request) {
-        return service.evaluate(request);
+        return service.evaluate(request).response();
     }
 }

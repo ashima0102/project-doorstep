@@ -33,11 +33,14 @@ public class LoanApplication {
     private int score;
     @Column(name = "evaluated_at")
     private Instant evaluatedAt;
+    private String payloadHash;
 
     protected LoanApplication() {
     }
 
-    public LoanApplication(ApplicationRequest request, Decision decision, int score, Instant evaluatedAt) {
+    public LoanApplication(ApplicationRequest request, String payloadHash, Decision decision, int score,
+                           Instant evaluatedAt) {
+        this.payloadHash = payloadHash;
         this.applicationId = request.applicationId();
         this.applicantName = request.applicantName();
         this.dob = request.dob();
@@ -64,4 +67,5 @@ public class LoanApplication {
     public Decision getDecision() { return decision; }
     public int getScore() { return score; }
     public Instant getEvaluatedAt() { return evaluatedAt; }
+    public String getPayloadHash() { return payloadHash; }
 }
