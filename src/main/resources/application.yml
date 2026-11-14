@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: doorstep
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/doorstep}
+    username: ${DB_USER:doorstep}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
