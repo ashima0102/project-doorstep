@@ -115,6 +115,7 @@ The replay publishes 1,000 new applications, 50 exact redeliveries, 10 conflicti
 cd ui && npm install && npm run dev        # http://localhost:5173, proxies /api to :8080
 ```
 
+- **Columns:** "System verdict" is the automated PASS/REVIEW/REJECT. "Underwriter outcome" is the human case status. An APPROVED outcome on a REJECT verdict is flagged OVERRIDDEN.
 - **Left, the queue:** filterable by status, highest score first (sorted by the API using the `(status, score desc)` index). It shows masked PAN and phone.
 - **Right, the detail panel:** opens on clicking a case. It shows the masked identifiers, device, amount, each rule hit with its reason, and the audit history. It also has APPROVE / REJECT / ESCALATE buttons with an acting-user field and a comment box. When the API rejects an action (409 invalid transition, 400 short comment), its message is shown in red under the buttons.
 
@@ -189,6 +190,7 @@ p95 evaluation latency : 5.4 ms
 - Fuzzy name matching (Jaro-Winkler) for `KYC_MISMATCH` and PAN reuse, to catch initials and transposed names.
 - Atomic Redis read-and-record via a Lua script, to close the small race between two simultaneous applications on the same phone.
 - Spring Security with UNDERWRITER / SENIOR_UNDERWRITER roles instead of the trusted `X-User` header.
+- Four-eyes rule for overrides: approving a case the system scored REJECT would require ESCALATE first and then a senior underwriter. Today the brief's state machine allows OPEN → APPROVED for any case, and the UI only warns before an override and marks it as OVERRIDDEN in the queue.
 - A database trigger that forbids UPDATE/DELETE on `case_audit`, as defence in depth.
 - Testcontainers-based integration tests for PostgreSQL + Redis + Kafka under `-Pintegration`.
 - An outbox table for decision events (today they're sent after commit, so a crash in between can drop one).

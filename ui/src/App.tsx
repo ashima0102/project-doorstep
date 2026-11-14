@@ -5,6 +5,7 @@ const STATUSES: (CaseStatus | '')[] = ['OPEN', 'ESCALATED', 'APPROVED', 'REJECTE
 const ACTIONS: CaseAction[] = ['APPROVE', 'REJECT', 'ESCALATE'];
 const MIN_COMMENT = 10;
 
+const isOverride = (c: { decision: string; status: CaseStatus }) => c.decision === 'REJECT' && c.status === 'APPROVED';
 const riskLevel = (score: number) => (score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low');
 
 export default function App() {
@@ -19,7 +20,8 @@ export default function App() {
 
   useEffect(loadQueue, [loadQueue]);
 
-  const rejects = cases.filter((c) => c.decision === 'REJECT').length;
+  const highRisk = cases.filter((c) => c.score >= 60).length;
+  const open = cases.filter((c) => c.status === 'OPEN' || c.status === 'ESCALATED').length;
 
   return (
     <div className="app">
@@ -33,8 +35,8 @@ export default function App() {
         </div>
         <div className="stats">
           <Stat label="Cases in view" value={cases.length} />
-          <Stat label="Auto-reject" value={rejects} tone="high" />
-          <Stat label="Needs review" value={cases.length - rejects} tone="medium" />
+          <Stat label="High risk (≥60)" value={highRisk} tone="high" />
+          <Stat label="Awaiting underwriter" value={open} tone="medium" />
         </div>
       </header>
 
@@ -55,7 +57,7 @@ export default function App() {
           {error && <p role="alert" className="error">{error}</p>}
           <table>
             <thead>
-              <tr><th>Score</th><th>Applicant</th><th>PAN</th><th>Phone</th><th>Decision</th><th>Status</th></tr>
+              <tr><th>Score</th><th>Applicant</th><th>PAN</th><th>Phone</th><th>System verdict</th><th>Underwriter outcome</th></tr>
             </thead>
             <tbody>
               {cases.map((c) => (
@@ -66,7 +68,7 @@ export default function App() {
                   <td className="mono">{c.maskedPan}</td>
                   <td className="mono">{c.maskedPhone}</td>
                   <td><span className={`pill decision-${c.decision}`}>{c.decision}</span></td>
-                  <td><span className={`pill status-${c.status}`}>{c.status}</span></td>
+                  <td><span className={`pill status-${c.status}`}>{c.status}</span>{isOverride(c) && <span className="pill override">OVERRIDDEN</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -148,8 +150,8 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
         <div><dt>Phone</dt><dd className="mono">{detail.maskedPhone}</dd></div>
         <div><dt>Device</dt><dd className="mono">{detail.deviceId}</dd></div>
         <div><dt>Requested</dt><dd>₹{Number(detail.requestedAmount).toLocaleString('en-IN')}</dd></div>
-        <div><dt>Decision</dt><dd><span className={`pill decision-${detail.decision}`}>{detail.decision}</span></dd></div>
-        <div><dt>Status</dt><dd><span className={`pill status-${detail.status}`}>{detail.status}</span></dd></div>
+        <div><dt>System verdict</dt><dd><span className={`pill decision-${detail.decision}`}>{detail.decision}</span></dd></div>
+        <div><dt>Underwriter outcome</dt><dd><span className={`pill status-${detail.status}`}>{detail.status}</span></dd></div>
       </dl>
 
       <h3>Why it was flagged</h3>
@@ -163,6 +165,9 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
       </ul>
 
       <h3>Take action</h3>
+      {detail.decision === 'REJECT' && !final && (
+        <p className="warn">⚠ The system verdict is REJECT. Approving overrides it, and your name and comment are written to the audit trail.</p>
+      )}
       {final && <p className="muted">This case is {detail.status} and final. The server will refuse further actions.</p>}
       <label className="field">Acting underwriter
         <input aria-label="Acting user" value={user} onChange={(e) => setUser(e.target.value)} />
