@@ -40,6 +40,11 @@ public class FraudCase {
         return c;
     }
 
+    public void moveTo(CaseStatus next, Instant now) {
+        this.status = next;
+        this.updatedAt = now;
+    }
+
     public UUID getCaseId() { return caseId; }
     public String getApplicationId() { return applicationId; }
     public int getScore() { return score; }
