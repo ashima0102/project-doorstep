@@ -35,7 +35,7 @@ class GeneratorPipelineTest {
         Map<String, Integer> rules = new TreeMap<>();
         int cases = 0;
         for (ApplicationRequest application : applications) {
-            EvaluationResponse result = service.evaluate(application);
+            EvaluationResponse result = service.evaluate(application).response();
             decisions.merge(result.decision().name(), 1, Integer::sum);
             result.ruleHits().stream().map(RuleHit::ruleId).forEach(id -> rules.merge(id, 1, Integer::sum));
             if (result.caseId() != null) {

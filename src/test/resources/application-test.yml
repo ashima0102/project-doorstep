@@ -8,3 +8,5 @@ spring:
 doorstep:
   signals:
     store: memory
+  kafka:
+    enabled: false   # Kafka tests switch this on together with @EmbeddedKafka
