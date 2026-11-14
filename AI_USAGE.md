@@ -20,7 +20,8 @@
 - **It first put `@Validated` + `@NotBlank` on the `X-User` header.** That triggers AOP method validation, which throws `ConstraintViolationException` (a 500 with our handler), not a 400. It also risks changing how `@Valid @RequestBody` errors are reported. I replaced it with an explicit blank check that maps to 400, plus a handler for a missing header.
 - **It left an empty placeholder class (`Repositories.java`) and an unused field in a test.** Both were dead code, and I removed them.
 - **Hibernate `ddl-auto: validate` against `timestamptz` / `Instant` mappings** risked startup failures that differ between H2 and PostgreSQL. I set it to `none`, so Flyway is the single owner of the schema.
-- _Add anything `mvn test` / `npm test` surfaced on my machine and how it was fixed._
+- **The first `mvn test` failed to compile.** In `ApplicationApiTest` it had written a helper method named `post(ApplicationRequest)`, which hides the statically imported `MockMvcRequestBuilders.post(String)`, so `post("/api/applications")` no longer compiled. I renamed the helper to `submit(...)` and added the fix on the Task 1 branch, where the bug came from.
+- After that fix, `mvn test` passed: 45 tests across 11 classes, including `@EmbeddedKafka`, all offline. `npm test` passed the first time.
 
 ## What I verified myself
 - Every rule's reason string masks the PAN and phone.
