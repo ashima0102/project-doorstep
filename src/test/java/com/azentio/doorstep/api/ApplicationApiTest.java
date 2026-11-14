@@ -33,7 +33,7 @@ class ApplicationApiTest {
     @Autowired
     ObjectMapper json;
 
-    private String post(ApplicationRequest request) throws Exception {
+    private String submit(ApplicationRequest request) throws Exception {
         return mvc.perform(post("/api/applications").contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -42,7 +42,7 @@ class ApplicationApiTest {
 
     @Test
     void validApplicationReturnsDecisionScoreAndRuleHits() throws Exception {
-        String body = post(TestFixtures.clean().id("API-1").pan("ZXCVB1111Q").phone("9000000001")
+        String body = submit(TestFixtures.clean().id("API-1").pan("ZXCVB1111Q").phone("9000000001")
                 .device("dev-api-1").submittedAt(Instant.now()).build());
         JsonNode result = json.readTree(body);
         assertThat(result.get("decision").asText()).isEqualTo("PASS");
@@ -65,7 +65,7 @@ class ApplicationApiTest {
     @Test
     void caseEndpointsNeverExposeFullPanOrPhone() throws Exception {
         // KYC mismatch (30) + inflated income (20) = 50 -> REVIEW -> opens a case
-        String body = post(TestFixtures.clean().id("API-CASE-1").pan(FULL_PAN).phone(FULL_PHONE)
+        String body = submit(TestFixtures.clean().id("API-CASE-1").pan(FULL_PAN).phone(FULL_PHONE)
                 .device("dev-api-case").verified(false).bureauIncome("10000").declaredIncome("90000")
                 .submittedAt(Instant.now()).build());
         assertThat(body).doesNotContain(FULL_PAN).doesNotContain(FULL_PHONE);
