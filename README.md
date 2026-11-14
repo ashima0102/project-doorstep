@@ -142,26 +142,47 @@ cd ui && npm install && npm test
 
 ## Measured numbers
 
-> Fill in after running against the live stack. The figures below must come from an actual run.
+Measured on a MacBook Air (Apple silicon) against `docker compose` PostgreSQL 16, Redis 7 and Kafka 3.8 (KRaft), on 14 Nov 2026.
 
-**Generator run (Task 1)**, `scripts/generate.sh 500`:
+**Generator through the REST API (Task 1)**, `scripts/generate.sh 500`:
+
+```
+Posted 500 applications
+Decisions: {PASS=469, REJECT=4, REVIEW=27}
+Rule hits: {DEVICE_SHARED=6, INCOME_INFLATED=30, KYC_MISMATCH=15, PAN_REUSED_DIFFERENT_IDENTITY=4, PHONE_SHARED=6, THIN_FILE_HIGH_AMOUNT=15}
+Cases created: 31
+```
 
 | Decision | Count |
 |---|---|
-| PASS | _tbd_ |
-| REVIEW | _tbd_ |
-| REJECT | _tbd_ |
+| PASS | 469 |
+| REVIEW | 27 |
+| REJECT | 4 |
 
-| Rule | Hits |
-|---|---|
-| PHONE_SHARED | 6 (asserted in `GeneratorPipelineTest`) |
-| DEVICE_SHARED | 6 (asserted) |
-| PAN_REUSED_DIFFERENT_IDENTITY | 4 (asserted) |
-| INCOME_INFLATED / KYC_MISMATCH / THIN_FILE_HIGH_AMOUNT | _tbd_ |
+| Rule | Hits | Seeded pattern |
+|---|---|---|
+| PHONE_SHARED | 6 | 8 PANs on one phone: PANs 3 to 8 fire |
+| DEVICE_SHARED | 6 | 8 PANs on one device: PANs 3 to 8 fire |
+| PAN_REUSED_DIFFERENT_IDENTITY | 4 | 1 PAN, 5 names: names 2 to 5 fire (60 points, REJECT) |
+| KYC_MISMATCH | 15 | 15 name-on-ID mismatches (30 points, REVIEW) |
+| INCOME_INFLATED | 30 | 30 applicants declaring more than 3x the bureau estimate |
+| THIN_FILE_HIGH_AMOUNT | 15 | 15 thin files asking for more than 3,00,000 |
 
-`GeneratorPipelineTest` also prints the full breakdown as a `Generator run:` line in the `mvn test` output.
+Cases = REVIEW + REJECT = 31. INCOME_INFLATED (20) and THIN_FILE_HIGH_AMOUNT (15) on their own stay below the REVIEW threshold of 30, so those applicants PASS with the reason recorded. This is by design under the default weights.
 
-**Replay run (Task 2)**, `scripts/replay.sh`: _tbd: paste output (evaluated, duplicates, DLT, cases, p95 ms)_
+**Kafka replay (Task 2)**, `scripts/replay.sh` (1,000 new + 50 exact redeliveries + 10 conflicting + 10 malformed):
+
+```
+Published 1070 messages; waiting for the service to drain...
+Applications evaluated : 1000
+Duplicates skipped     : 50
+Sent to DLT            : 20
+Cases created          : 32
+p95 evaluation latency : 5.4 ms
+```
+
+- **Cases:** 31 of the 32 come from the replay (15 KYC + 6 phone ring + 6 device ring + 4 recycled PAN = REVIEW + REJECT). The extra case came from one manual `curl` demo application posted earlier in the same service run, since the counter covers the whole run.
+- **p95:** consume to decision, measured by the Micrometer timer `doorstep.evaluation.latency`. 5.4 ms is well under the 50 ms target.
 
 ## What I would do next
 
