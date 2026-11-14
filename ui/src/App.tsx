@@ -3,6 +3,9 @@ import { api, AuditEntry, CaseAction, CaseDetail, CaseStatus, CaseSummary } from
 
 const STATUSES: (CaseStatus | '')[] = ['OPEN', 'ESCALATED', 'APPROVED', 'REJECTED', ''];
 const ACTIONS: CaseAction[] = ['APPROVE', 'REJECT', 'ESCALATE'];
+const MIN_COMMENT = 10;
+
+const riskLevel = (score: number) => (score >= 60 ? 'high' : score >= 30 ? 'medium' : 'low');
 
 export default function App() {
   const [status, setStatus] = useState<CaseStatus | ''>('OPEN');
@@ -16,34 +19,81 @@ export default function App() {
 
   useEffect(loadQueue, [loadQueue]);
 
+  const rejects = cases.filter((c) => c.decision === 'REJECT').length;
+
   return (
-    <main className="layout">
-      <section className="queue">
-        <h1>Review queue</h1>
-        <label>
-          Status{' '}
-          <select value={status} onChange={(e) => setStatus(e.target.value as CaseStatus | '')}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s || 'ALL'}</option>)}
-          </select>
-        </label>
-        {error && <p role="alert" className="error">{error}</p>}
-        <table>
-          <thead>
-            <tr><th>Score</th><th>Applicant</th><th>PAN</th><th>Phone</th><th>Decision</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {cases.map((c) => (
-              <tr key={c.caseId} onClick={() => setSelected(c.caseId)}
-                  className={c.caseId === selected ? 'selected' : undefined}>
-                <td>{c.score}</td><td>{c.applicantName}</td><td>{c.maskedPan}</td>
-                <td>{c.maskedPhone}</td><td>{c.decision}</td><td>{c.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      {selected && <CasePanel caseId={selected} onChanged={loadQueue} />}
-    </main>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="logo" aria-hidden>◆</span>
+          <div>
+            <div className="brand-name">Doorstep</div>
+            <div className="brand-sub">Underwriter fraud review</div>
+          </div>
+        </div>
+        <div className="stats">
+          <Stat label="Cases in view" value={cases.length} />
+          <Stat label="Auto-reject" value={rejects} tone="high" />
+          <Stat label="Needs review" value={cases.length - rejects} tone="medium" />
+        </div>
+      </header>
+
+      <main className="layout">
+        <section className="card queue">
+          <div className="card-head">
+            <h1>Review queue</h1>
+            <div className="filters" role="group" aria-label="Status filter">
+              {STATUSES.map((s) => (
+                <button key={s || 'ALL'} className={`chip ${s === status ? 'active' : ''}`}
+                        onClick={() => { setStatus(s); setSelected(null); }}>
+                  {s || 'ALL'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="hint">Highest risk first. Click a row to open the case.</p>
+          {error && <p role="alert" className="error">{error}</p>}
+          <table>
+            <thead>
+              <tr><th>Score</th><th>Applicant</th><th>PAN</th><th>Phone</th><th>Decision</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {cases.map((c) => (
+                <tr key={c.caseId} onClick={() => setSelected(c.caseId)}
+                    className={`${c.caseId === selected ? 'selected' : ''} risk-${riskLevel(c.score)}`}>
+                  <td><span className={`score ${riskLevel(c.score)}`}>{c.score}</span></td>
+                  <td className="name">{c.applicantName}</td>
+                  <td className="mono">{c.maskedPan}</td>
+                  <td className="mono">{c.maskedPhone}</td>
+                  <td><span className={`pill decision-${c.decision}`}>{c.decision}</span></td>
+                  <td><span className={`pill status-${c.status}`}>{c.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {cases.length === 0 && !error && <p className="empty">No cases with this status.</p>}
+        </section>
+
+        {selected
+          ? <CasePanel caseId={selected} onChanged={loadQueue} />
+          : (
+            <aside className="card detail placeholder">
+              <div className="placeholder-icon" aria-hidden>☜</div>
+              <h2>Select a case</h2>
+              <p>Click any row in the queue to see why it was flagged, act on it, and view its audit trail.</p>
+            </aside>
+          )}
+      </main>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
+  return (
+    <div className={`stat ${tone ?? ''}`}>
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+    </div>
   );
 }
 
@@ -53,6 +103,7 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
   const [comment, setComment] = useState('');
   const [user, setUser] = useState('underwriter');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     api.getCase(caseId).then(setDetail).catch((e: Error) => setError(e.message));
@@ -61,14 +112,17 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
 
   useEffect(() => {
     setError(null);
+    setNotice(null);
     refresh();
   }, [refresh]);
 
   const act = async (action: CaseAction) => {
     setError(null);
+    setNotice(null);
     try {
-      await api.act(caseId, action, comment, user);
+      const updated = await api.act(caseId, action, comment, user);
       setComment('');
+      setNotice(`Case moved to ${updated.status}`);
       refresh();
       onChanged();
     } catch (e) {
@@ -76,28 +130,70 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
     }
   };
 
-  if (!detail) return <section className="detail">Loading…</section>;
+  if (!detail) return <aside className="card detail">Loading…</aside>;
+  const level = riskLevel(detail.score);
+  const final = detail.status === 'APPROVED' || detail.status === 'REJECTED';
   return (
-    <section className="detail">
-      <h2>{detail.applicantName} · score {detail.score}</h2>
-      <p>PAN {detail.maskedPan} · Phone {detail.maskedPhone} · Device {detail.deviceId}</p>
-      <p>Requested {detail.requestedAmount} · {detail.decision} · <strong>{detail.status}</strong></p>
-      <h3>Rule hits</h3>
-      <ul>
-        {detail.ruleHits.map((h) => <li key={h.ruleId}><b>{h.ruleId}</b> (+{h.points}) {h.reason}</li>)}
-      </ul>
-      <h3>Action</h3>
-      <input aria-label="Acting user" value={user} onChange={(e) => setUser(e.target.value)} />
-      <textarea aria-label="Comment" placeholder="Comment (at least 10 characters)" value={comment}
-                onChange={(e) => setComment(e.target.value)} />
-      <div>{ACTIONS.map((a) => <button key={a} onClick={() => act(a)}>{a}</button>)}</div>
-      {error && <p role="alert" className="error">{error}</p>}
-      <h3>Audit history</h3>
-      <ol>
-        {audit.map((a) => (
-          <li key={a.at}>{a.at}: {a.fromStatus} → {a.toStatus} by {a.actor}: “{a.comment}”</li>
+    <aside className="card detail">
+      <div className={`detail-head ${level}`}>
+        <div>
+          <h2>{detail.applicantName}</h2>
+          <div className="sub">{detail.applicationId}</div>
+        </div>
+        <div className={`score big ${level}`}>{detail.score}</div>
+      </div>
+
+      <dl className="facts">
+        <div><dt>PAN</dt><dd className="mono">{detail.maskedPan}</dd></div>
+        <div><dt>Phone</dt><dd className="mono">{detail.maskedPhone}</dd></div>
+        <div><dt>Device</dt><dd className="mono">{detail.deviceId}</dd></div>
+        <div><dt>Requested</dt><dd>₹{Number(detail.requestedAmount).toLocaleString('en-IN')}</dd></div>
+        <div><dt>Decision</dt><dd><span className={`pill decision-${detail.decision}`}>{detail.decision}</span></dd></div>
+        <div><dt>Status</dt><dd><span className={`pill status-${detail.status}`}>{detail.status}</span></dd></div>
+      </dl>
+
+      <h3>Why it was flagged</h3>
+      <ul className="hits">
+        {detail.ruleHits.map((h) => (
+          <li key={h.ruleId}>
+            <div className="hit-top"><span className="rule">{h.ruleId}</span><span className="points">+{h.points}</span></div>
+            <div className="reason">{h.reason}</div>
+          </li>
         ))}
-      </ol>
-    </section>
+      </ul>
+
+      <h3>Take action</h3>
+      {final && <p className="muted">This case is {detail.status} and final. The server will refuse further actions.</p>}
+      <label className="field">Acting underwriter
+        <input aria-label="Acting user" value={user} onChange={(e) => setUser(e.target.value)} />
+      </label>
+      <label className="field">Comment
+        <textarea aria-label="Comment" placeholder={`Why? (at least ${MIN_COMMENT} characters)`} value={comment}
+                  onChange={(e) => setComment(e.target.value)} />
+        <span className={`counter ${comment.trim().length >= MIN_COMMENT ? 'ok' : ''}`}>
+          {comment.trim().length}/{MIN_COMMENT}
+        </span>
+      </label>
+      <div className="actions">
+        {ACTIONS.map((a) => <button key={a} className={`btn btn-${a}`} onClick={() => act(a)}>{a}</button>)}
+      </div>
+      {error && <p role="alert" className="error">⚠ {error}</p>}
+      {notice && <p role="status" className="success">✓ {notice}</p>}
+
+      <h3>Audit trail</h3>
+      {audit.length === 0
+        ? <p className="muted">No actions yet.</p>
+        : (
+          <ol className="timeline">
+            {audit.map((a) => (
+              <li key={a.at}>
+                <div className="when">{new Date(a.at).toLocaleString()}</div>
+                <div><span className={`pill status-${a.fromStatus}`}>{a.fromStatus}</span> → <span className={`pill status-${a.toStatus}`}>{a.toStatus}</span> by <b>{a.actor}</b></div>
+                <div className="reason">“{a.comment}”</div>
+              </li>
+            ))}
+          </ol>
+        )}
+    </aside>
   );
 }
