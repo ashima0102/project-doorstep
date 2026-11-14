@@ -8,7 +8,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none   # Flyway owns the schema
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -19,3 +19,33 @@ management:
     web:
       exposure:
         include: health,metrics
+
+doorstep:
+  signals:
+    store: redis   # redis | memory
+
+fraud:
+  thresholds:
+    review: 30     # score >= review  -> REVIEW
+    reject: 60     # score >= reject  -> REJECT
+  rules:
+    pan-reused:
+      points: 60
+      window: 30d
+    phone-shared:
+      points: 35
+      window: 30d
+      min-distinct-pans: 3
+    device-shared:
+      points: 35
+      window: 24h
+      min-distinct-pans: 3
+    kyc-mismatch:
+      points: 30
+    thin-file:
+      points: 15
+      min-history-months: 6
+      amount-above: 300000
+    income-inflated:
+      points: 20
+      multiplier: 3

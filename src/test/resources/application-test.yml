@@ -1,0 +1,10 @@
+# Offline test profile: H2 in PostgreSQL mode and the in-memory signal store. No Docker needed.
+spring:
+  datasource:
+    url: jdbc:h2:mem:doorstep;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+doorstep:
+  signals:
+    store: memory
