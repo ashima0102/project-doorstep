@@ -9,6 +9,16 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: none   # Flyway owns the schema
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: doorstep-fraud-check
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      acks: all
+    listener:
+      ack-mode: record
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -23,6 +33,10 @@ management:
 doorstep:
   signals:
     store: redis   # redis | memory
+  kafka:
+    enabled: true
+    applications-topic: loan.applications.v1
+    decisions-topic: loan.decisions.v1
 
 fraud:
   thresholds:
