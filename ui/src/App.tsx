@@ -168,7 +168,8 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
       {detail.decision === 'REJECT' && !final && (
         <p className="warn">⚠ The system verdict is REJECT. Approving overrides it, and your name and comment are written to the audit trail.</p>
       )}
-      {final && <p className="muted">This case is {detail.status} and final. The server will refuse further actions.</p>}
+      {final && <p className="muted">This case is {detail.status}, which is final. No further actions are allowed.</p>}
+      {!final && (<>
       <label className="field">Acting underwriter
         <input aria-label="Acting user" value={user} onChange={(e) => setUser(e.target.value)} />
       </label>
@@ -182,6 +183,7 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
       <div className="actions">
         {ACTIONS.map((a) => <button key={a} className={`btn btn-${a}`} onClick={() => act(a)}>{a}</button>)}
       </div>
+      </>)}
       {error && <p role="alert" className="error">⚠ {error}</p>}
       {notice && <p role="status" className="success">✓ {notice}</p>}
 
@@ -191,7 +193,7 @@ function CasePanel({ caseId, onChanged }: { caseId: string; onChanged: () => voi
         : (
           <ol className="timeline">
             {audit.map((a) => (
-              <li key={a.at}>
+              <li key={`${a.at}-${a.toStatus}`}>
                 <div className="when">{new Date(a.at).toLocaleString()}</div>
                 <div><span className={`pill status-${a.fromStatus}`}>{a.fromStatus}</span> → <span className={`pill status-${a.toStatus}`}>{a.toStatus}</span> by <b>{a.actor}</b></div>
                 <div className="reason">“{a.comment}”</div>
